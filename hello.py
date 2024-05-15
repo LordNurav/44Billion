@@ -23,9 +23,6 @@ def update_label(input_text):
     return f"{input_text}"
 
 def log_user_activity(ip_address, completion, file_name='user_log.xlsx'):
-    # TODO: Transition from demo excel to Azure Data Table
-    # Note that completion is here to distinguish between reaching end state or not
-    # Check if the file exists to either read the existing data or create a new DataFrame
     if os.path.exists(file_name):
         df = pd.read_excel(file_name)
     else:

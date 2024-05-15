@@ -84,22 +84,6 @@ def scrape(urls):
     docs = loader.load()
     return docs
 
-    '''
-    # Send a GET request to the URL
-    response = requests.get(url)
-
-    # Check if the request was successful
-    if response.status_code == 200:
-        # Print the HTML content of the response
-        #print(response.text)
-        # TODO: consider stripping html tags or any extra tokens?  
-        return response.text
-    else:
-        # Print an error message
-        print(f"Request failed with status code {response.status_code}")
-
-    '''
-
 def chat(message):
     
     #urls = [x for x in urls_list if x is not None and x != "NaN"]
@@ -136,17 +120,3 @@ def get_location():
         "country": response.get("country_name")
     }
     return location_data
-
-# Azure Table Storage logic
-def get_table_service():
-# """ Set the Azure Table Storage service """
-    return TableService(connection_string=os.environ.get("db_connection_string"))
-
-def get_dataframe_from_table_storage_table(table_service, filter_query):
-    # Create a dataframe from table storage data
-    return pd.DataFrame(get_data_from_table_storage_table(table_service, filter_query))
-
-def get_data_from_table_storage_table(table_service, filter_query):
-    # Retrieve data from Table Storage
-    for record in table_service.query_entities(os.environ.get("source_table"), filter=filter_query):
-        yield record
