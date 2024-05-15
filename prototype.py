@@ -24,7 +24,6 @@ from translate import Translator
 from azure.cosmosdb.table.tableservice import TableService
 import pandas as pd
 
-from constants import states
 
 langchain.debug = True
 load_dotenv()
@@ -39,27 +38,26 @@ gpt = AzureChatOpenAI(
     openai_api_type = os.environ.get("openai_api_type"),
 )
 
-def call_gpt_model(rag_from_bing, message):
-    system_template="You are a professional, helpful assistant to provide resources to combat childhood hunger.  \n"
+def call_gpt_model(message):
+    system_template="You are a professional creative artistic consultant designed to help come up with ideas for artistic expression given whatever objects are at the user's disposal.  \n"
     system_message_prompt = SystemMessagePromptTemplate.from_template(system_template)
 
     user_prompt=PromptTemplate(
-        template="## Context \n {rag_from_bing} \n" +
-                "## Instructions \n Considering all information you have at your disposal, answer the question below, giving as much specific detail as possible.\n" +
-                "## Question \n {message} \n",
-        input_variables=["rag_from_bing", "message"],
+        template="## Considering all information you have at your disposal, provide ideas given the objects below, giving as much specific detail as possible.\n" +
+                "## Objects: \n {message} \n",
+        input_variables=["message"],
     )
     human_message_prompt = HumanMessagePromptTemplate(prompt=user_prompt)
     chat_prompt = ChatPromptTemplate.from_messages([system_message_prompt, human_message_prompt])
 
     # Get formatted messages for the chat completion
-    messages = chat_prompt.format_prompt(rag_from_bing={rag_from_bing}, message={message}).to_messages()
+    messages = chat_prompt.format_prompt(message={message}).to_messages()
 
     # Call the model
     output = gpt(messages)
     return output.content
 
-def call_langchain_model(rag_from_bing, docs, user_ask):
+def call_langchain_model(user_ask):
     qa_template = """
         # Reference documentation
         {context} 
@@ -77,7 +75,7 @@ def call_langchain_model(rag_from_bing, docs, user_ask):
                         openai_api_base=os.environ.get("openai_endpoint"))
 
     chain = load_qa_chain(llm, chain_type="stuff", prompt=PROMPT)
-    result = chain({"input_documents": docs, "question": user_ask}, return_only_outputs=True)
+    result = chain({"question": user_ask}, return_only_outputs=True)
     #print(result)
     return result["output_text"]
 
@@ -102,71 +100,24 @@ def scrape(urls):
 
     '''
 
-def chat(message, state):
-    try:
-        # # Get location
-        # location = get_location()
-        # print("Location")
-        # print(location)
-
-        # # Table storage logic here
-        # state = location["region"]
-        print("State")
-        print(state)
-    except KeyError:
-        print("Error: 'region' key not found in the location dictionary.")
-    except Exception as e:
-        print(f"An error occurred: {str(e)}")
-        
-    #fq = "PartitionKey eq 'State'"
-    partition_key = 'State'
-    fq =  "PartitionKey eq '{}' and RowKey eq '{}'".format(partition_key, state)
-
-    ts = get_table_service()
-    #df = get_dataframe_from_table_storage_table(table_service=ts, filter_query=fq)
-    filteredList = get_dataframe_from_table_storage_table(table_service=ts, filter_query=fq)
-    pd.set_option('display.max_colwidth', None)
-    #filteredList = df[df["RowKey"] == state]
-    #print("Filtered List:")
-    #print(filteredList)
-
-    eligibility_website = None
-    snap_screener = None
-    eligibility_pdf = None
+def chat(message):
     
-    if 'EligibilityWebsite' in filteredList.columns:
-        eligibility_website = (filteredList['EligibilityWebsite']).to_string(index=False)
-    #print(eligibility_website)
-    
-    if 'SnapScreener' in filteredList.columns:
-        snap_screener = (filteredList['SnapScreener']).to_string(index=False)
-    #print(snap_screener)
-    
-    if 'OnlineApplication' in filteredList.columns:
-        online_application =  (filteredList['OnlineApplication']).to_string(index=False)
-    #print(online_application)
-    
-    if 'EligibilityPDF' in filteredList.columns:
-        eligibility_pdf =  (filteredList['EligibilityPDF']).to_string(index=False)
-    #print(eligibility_pdf)
-    
-    urls_list = [eligibility_website, snap_screener, online_application, eligibility_pdf]
-    #print(urls_list)
-    urls = [x for x in urls_list if x is not None and x != "NaN"]
-        
-    #Did some testing with this, not necessary nor helpful with helper program
-    
+    #urls = [x for x in urls_list if x is not None and x != "NaN"]
+     
     #bing_response = bingsearch.call_search_api(query, bing_endpoint, bing_api_key)
     #rag_from_bing = bing_response
-    rag_from_bing = ""
+    #rag_from_bing = ""
 
-    docs = scrape(urls)
-    gov_docs_langchain_response = call_langchain_model(rag_from_bing, docs, message)
+    #docs = scrape(urls)
+    
+    #langchain_response = call_langchain_model(rag_from_bing, message)
+
+    langchain_response = call_langchain_model(message)
     
     # Call GPT model with context from Bing
     #model_response =call_gpt_model(rag_from_bing, message)
     #return model_response
-    return gov_docs_langchain_response
+    return langchain_response
 
 
 # Gets the ip address of the request (user)
@@ -199,26 +150,3 @@ def get_data_from_table_storage_table(table_service, filter_query):
     # Retrieve data from Table Storage
     for record in table_service.query_entities(os.environ.get("source_table"), filter=filter_query):
         yield record
-
-def translate_to_spanish(input_text):
-    try:
-        translator= Translator(to_lang="es")
-        spanish_text = translator.translate(input_text)
-        return spanish_text
-    except Exception as e:
-        return str(e)
-
-# UI components (using Gradio - https://gradio.app)
-# This section no longer does anything
-chatbot = gr.Chatbot(bubble_full_width = False)
-with gr.Blocks() as sosChatBot:
-    with gr.Row():
-        statesArray = states
-        statesDropdown = gr.Dropdown(
-            statesArray, label="States", info="Choose your state"
-        ),
-
-    with gr.Row():
-        chat_interface = gr.ChatInterface(fn=chat, chatbot=chatbot)
-        
-#sosChatBot.launch()
